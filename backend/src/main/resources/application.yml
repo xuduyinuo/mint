@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/mint_search?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 12345678
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 300ms
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:mint-search-demo-secret-key-change-me-2026}
+    expiration-hours: 168
+
+newapi:
+  base-url: ${NEWAPI_BASE_URL:}
+  api-key: ${NEWAPI_API_KEY:}
+  model: ${NEWAPI_MODEL:gpt-4.1-mini}
+
+serpapi:
+  api-key: ${SERPAPI_API_KEY:}
+
+pexels:
+  api-key: ${PEXELS_API_KEY:OIcgUFKWvEFDOugoNR0AAqn1wY6zJsKughRc6KFFcJDi7bFGnfzlSEuZ}
+
+hot:
+  refresh-interval-ms: ${HOT_REFRESH_INTERVAL_MS:3600000}
