@@ -60,29 +60,35 @@ public class DomesticSearchProvider {
     }
 
     public List<SearchItemDto> search(String keyword, String type) {
+        return search(keyword, type, 1, 12);
+    }
+
+    public List<SearchItemDto> search(String keyword, String type, int page, int size) {
         String searchType = StringUtils.hasText(type) ? type : "all";
+        int searchPage = Math.max(page, 1);
+        int pageSize = Math.min(Math.max(size, 1), 16);
         List<SearchItemDto> items = new ArrayList<>();
         if ("all".equalsIgnoreCase(searchType) || "news".equalsIgnoreCase(searchType)) {
-            items.addAll(searchTencentNews(keyword));
+            items.addAll(searchTencentNews(keyword, searchPage, pageSize));
         }
         if ("all".equalsIgnoreCase(searchType) || "image".equalsIgnoreCase(searchType)) {
-            items.addAll(searchPexelsImages(keyword));
+            items.addAll(searchPexelsImages(keyword, searchPage, pageSize));
         }
         if ("all".equalsIgnoreCase(searchType) || "video".equalsIgnoreCase(searchType)) {
-            items.addAll(searchBilibiliVideos(keyword));
+            items.addAll(searchBilibiliVideos(keyword, searchPage, pageSize));
         }
         return items;
     }
 
-    private List<SearchItemDto> searchPexelsImages(String keyword) {
+    private List<SearchItemDto> searchPexelsImages(String keyword, int page, int size) {
         if (!StringUtils.hasText(pexelsApiKey)) {
             return List.of();
         }
         try {
             URI uri = UriComponentsBuilder.fromUriString("https://api.pexels.com/v1/search")
                     .queryParam("query", query(keyword))
-                    .queryParam("per_page", "24")
-                    .queryParam("page", "1")
+                    .queryParam("per_page", String.valueOf(size))
+                    .queryParam("page", String.valueOf(page))
                     .build()
                     .encode(StandardCharsets.UTF_8)
                     .toUri();
@@ -97,20 +103,71 @@ public class DomesticSearchProvider {
         }
     }
 
-    private List<SearchItemDto> searchTencentNews(String keyword) {
+    private List<SearchItemDto> searchTencentNews(String keyword, int page, int size) {
+        if (isHotKeyword(keyword)) {
+            List<SearchItemDto> hotItems = searchTencentHotNews(page, size);
+            if (!hotItems.isEmpty()) {
+                return hotItems;
+            }
+        }
+        int from = Math.max(page - 1, 0) * size;
+        int target = from + size;
+        List<SearchItemDto> items = new ArrayList<>();
+        String searchId = "";
+        boolean hasMore = true;
+        for (int sourcePage = 0; hasMore && items.size() < target && sourcePage < page * 5 + 5; sourcePage++) {
+            TencentNewsPage newsPage = fetchTencentNewsPage(keyword, sourcePage, size, searchId);
+            if (newsPage.items().isEmpty() && sourcePage == 0) {
+                break;
+            }
+            items.addAll(newsPage.items());
+            searchId = newsPage.searchId();
+            hasMore = newsPage.hasMore() && StringUtils.hasText(searchId);
+        }
+        if (items.size() > from) {
+            return items.stream().skip(from).limit(size).toList();
+        }
+        return searchGoogleNewsRss(keyword, page, size);
+    }
+
+    private List<SearchItemDto> searchTencentHotNews(int page, int size) {
         try {
             String raw = restClient.get()
-                    .uri(UriComponentsBuilder.fromUriString("https://i.news.qq.com/gw/pc_search/result")
-                            .queryParam("page", "0")
-                            .queryParam("query", query(keyword))
-                            .queryParam("is_pc", "1")
-                            .queryParam("hippy_custom_version", "25")
-                            .queryParam("search_type", "all")
-                            .queryParam("search_count_limit", "10")
-                            .queryParam("appver", "15.5_qqnews_7.1.80")
+                    .uri(UriComponentsBuilder.fromUriString("https://i.news.qq.com/web_feed/getHotQaChannelRankList")
+                            .queryParam("rank_id", "thing_hot_rank_qa_channel_realtime")
+                            .queryParam("page", String.valueOf(Math.max(page, 1)))
+                            .queryParam("size", String.valueOf(Math.max(size, 12)))
+                            .queryParam("id_hash", "")
                             .build()
                             .encode(StandardCharsets.UTF_8)
                             .toUri())
+                    .header("Referer", "https://news.qq.com/")
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                    .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36")
+                    .retrieve()
+                    .body(String.class);
+            return parseTencentHotNews(raw, "今日热点").stream().limit(size).toList();
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private TencentNewsPage fetchTencentNewsPage(String keyword, int page, int size, String searchId) {
+        try {
+            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString("https://i.news.qq.com/gw/pc_search/result")
+                    .queryParam("page", String.valueOf(page))
+                    .queryParam("query", encode(query(keyword)))
+                    .queryParam("is_pc", "1")
+                    .queryParam("hippy_custom_version", "25")
+                    .queryParam("search_type", "all")
+                    .queryParam("search_count_limit", String.valueOf(Math.max(size, 12)))
+                    .queryParam("appver", "15.5_qqnews_7.1.80");
+            if (StringUtils.hasText(searchId)) {
+                builder.queryParam("search_id", searchId);
+            }
+            String raw = restClient.get()
+                    .uri(builder.build().encode(StandardCharsets.UTF_8).toUri())
                     .header("Referer", UriComponentsBuilder.fromUriString("https://news.qq.com/search")
                             .queryParam("query", query(keyword))
                             .encode(StandardCharsets.UTF_8)
@@ -121,16 +178,18 @@ public class DomesticSearchProvider {
                     .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36")
                     .retrieve()
                     .body(String.class);
-            List<SearchItemDto> items = parseTencentNews(raw, keyword);
-            if (!items.isEmpty()) {
-                return items;
-            }
+            JsonNode root = objectMapper.readTree(raw);
+            return new TencentNewsPage(
+                    parseTencentNews(raw, keyword),
+                    root.path("search_id").asText(""),
+                    root.path("hasMore").asInt(0) == 1
+            );
         } catch (Exception ignored) {
+            return new TencentNewsPage(List.of(), "", false);
         }
-        return searchGoogleNewsRss(keyword);
     }
 
-    private List<SearchItemDto> searchGoogleNewsRss(String keyword) {
+    private List<SearchItemDto> searchGoogleNewsRss(String keyword, int page, int size) {
         try {
             String raw = restClient.get()
                     .uri(UriComponentsBuilder.fromUriString("https://news.google.com/rss/search")
@@ -143,20 +202,21 @@ public class DomesticSearchProvider {
                             .toUri())
                     .retrieve()
                     .body(String.class);
-            return parseGoogleNewsRss(raw, keyword);
+            int from = Math.max(page - 1, 0) * size;
+            return parseGoogleNewsRss(raw, keyword).stream().skip(from).limit(size).toList();
         } catch (Exception ignored) {
             return List.of();
         }
     }
 
-    private List<SearchItemDto> searchBilibiliVideos(String keyword) {
+    private List<SearchItemDto> searchBilibiliVideos(String keyword, int page, int size) {
         try {
             String raw = restClient.get()
                     .uri(UriComponentsBuilder.fromUriString("https://api.bilibili.com/x/web-interface/search/type")
                             .queryParam("search_type", "video")
                             .queryParam("keyword", query(keyword))
-                            .queryParam("page", "1")
-                            .queryParam("page_size", "12")
+                            .queryParam("page", String.valueOf(page))
+                            .queryParam("page_size", String.valueOf(size))
                             .build()
                             .encode(StandardCharsets.UTF_8)
                             .toUri())
@@ -171,7 +231,7 @@ public class DomesticSearchProvider {
         }
         try {
             String raw = restClient.get()
-                    .uri(buildBilibiliVideoSearchUri(keyword))
+                    .uri(buildBilibiliVideoSearchUri(keyword, page, size))
                     .header("Referer", "https://search.bilibili.com/")
                     .retrieve()
                     .body(String.class);
@@ -249,6 +309,18 @@ public class DomesticSearchProvider {
         return items.stream().limit(24).toList();
     }
 
+    public List<SearchItemDto> parseTencentHotNews(String json, String keyword) throws Exception {
+        JsonNode articles = objectMapper.readTree(json).path("data").path("article_info").path("articles");
+        List<SearchItemDto> items = new ArrayList<>();
+        if (!articles.isArray()) {
+            return items;
+        }
+        for (JsonNode node : articles) {
+            addTencentHotNode(items, node, keyword);
+        }
+        return items.stream().limit(24).toList();
+    }
+
     public List<SearchItemDto> parseGoogleNewsRss(String xml, String keyword) {
         List<SearchItemDto> items = new ArrayList<>();
         Jsoup.parse(xml, "", Parser.xmlParser()).select("item").forEach(element -> {
@@ -277,13 +349,20 @@ public class DomesticSearchProvider {
         }
         for (JsonNode node : results) {
             String title = cleanHtml(node.path("title").asText(""));
-            if (!StringUtils.hasText(title)) {
+            String url = firstText(node, "arcurl", "url");
+            String thumbnailUrl = normalizeUrl(firstNonBlank(
+                    node.path("pic").asText(""),
+                    node.path("cover").asText(""),
+                    node.path("pic_url").asText("")
+            ));
+            if (!StringUtils.hasText(title) || !StringUtils.hasText(url)
+                    || isPaidBilibiliResult(node) || !isSupportedBilibiliThumbnail(thumbnailUrl)) {
                 continue;
             }
             SearchItemDto item = baseItem("video", textOrDefault(node.path("author").asText(""), "B站"), keyword, title, items.size() + 1);
-            item.setUrl(firstText(node, "arcurl", "url"));
+            item.setUrl(url);
             item.setSummary(textOrDefault(cleanHtml(node.path("description").asText("")), "B站视频搜索结果，关键词：" + query(keyword)));
-            item.setThumbnailUrl(mediaProxyUrl(normalizeUrl(node.path("pic").asText(""))));
+            item.setThumbnailUrl(mediaProxyUrl(thumbnailUrl));
             item.setPublishedAt(parseUnix(node.path("pubdate").asLong(0)));
             items.add(item);
         }
@@ -321,6 +400,9 @@ public class DomesticSearchProvider {
         item.setTags(query(keyword) + "," + sourceName);
         item.setAuthorityScore(0.82);
         return item;
+    }
+
+    private record TencentNewsPage(List<SearchItemDto> items, String searchId, boolean hasMore) {
     }
 
     private LocalDateTime parseTencentTime(JsonNode node) {
@@ -361,6 +443,62 @@ public class DomesticSearchProvider {
         return StringUtils.hasText(source) ? source : "腾讯新闻";
     }
 
+    private void addTencentHotNode(List<SearchItemDto> items, JsonNode node, String keyword) {
+        String title = textOrDefault(firstText(node, "short_title", "title"), node.path("share_info").path("share_title").asText(""));
+        String url = firstText(node.path("link_info"), "url", "share_url", "short_url", "org_url");
+        if (StringUtils.hasText(title) && StringUtils.hasText(url)) {
+            SearchItemDto item = baseItem("news", tencentHotSourceName(node), keyword, cleanHtml(title), items.size() + 1);
+            item.setUrl(url);
+            item.setSummary(textOrDefault(cleanHtml(node.path("abstract").asText("")), "腾讯新闻热点，关键词：" + query(keyword)));
+            item.setThumbnailUrl(tencentHotThumbnail(node));
+            item.setPublishedAt(parseTencentHotTime(node));
+            items.add(item);
+        }
+        JsonNode subItems = node.path("sub_item");
+        if (subItems.isArray()) {
+            for (JsonNode subItem : subItems) {
+                addTencentHotNode(items, subItem, keyword);
+            }
+        }
+    }
+
+    private String tencentHotSourceName(JsonNode node) {
+        return textOrDefault(
+                firstNonBlank(
+                        node.path("media_info").path("chl_name").asText(""),
+                        node.path("user_info").path("nick").asText("")
+                ),
+                "腾讯新闻"
+        );
+    }
+
+    private String tencentHotThumbnail(JsonNode node) {
+        JsonNode picInfo = node.path("pic_info");
+        return firstNonBlank(
+                firstArrayText(picInfo.path("small_img")),
+                firstArrayText(picInfo.path("big_img")),
+                firstArrayText(picInfo.path("three_img")),
+                picInfo.path("share_img").asText(""),
+                picInfo.path("ext").path("360x240").asText(""),
+                picInfo.path("ext").path("196x130").asText("")
+        );
+    }
+
+    private LocalDateTime parseTencentHotTime(JsonNode node) {
+        String value = firstText(node, "publish_time", "update_time");
+        if (StringUtils.hasText(value)) {
+            try {
+                return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } catch (Exception ignored) {
+            }
+        }
+        return LocalDateTime.now();
+    }
+
+    private String firstArrayText(JsonNode node) {
+        return node.isArray() && !node.isEmpty() ? node.get(0).asText("") : "";
+    }
+
     private String firstText(JsonNode node, String... fields) {
         for (String field : fields) {
             String value = node.path(field).asText("");
@@ -371,7 +509,7 @@ public class DomesticSearchProvider {
         return "";
     }
 
-    private URI buildBilibiliVideoSearchUri(String keyword) throws Exception {
+    private URI buildBilibiliVideoSearchUri(String keyword, int page, int size) throws Exception {
         JsonNode nav = objectMapper.readTree(restClient.get()
                 .uri("https://api.bilibili.com/x/web-interface/nav")
                 .retrieve()
@@ -381,8 +519,8 @@ public class DomesticSearchProvider {
         String mixinKey = mixinKey(imgKey + subKey);
         Map<String, String> params = new TreeMap<>();
         params.put("keyword", query(keyword));
-        params.put("page", "1");
-        params.put("page_size", "12");
+        params.put("page", String.valueOf(page));
+        params.put("page_size", String.valueOf(size));
         params.put("search_type", "video");
         params.put("wts", String.valueOf(Instant.now().getEpochSecond()));
         String queryString = queryString(params);
@@ -410,6 +548,31 @@ public class DomesticSearchProvider {
             return thumbnail.asText("");
         }
         return firstText(thumbnail, "static", "rich", "url");
+    }
+
+    private boolean isPaidBilibiliResult(JsonNode node) {
+        String resultType = node.path("type").asText("");
+        String url = firstText(node, "arcurl", "url");
+        String badges = (node.path("badge").asText("") + " " + node.path("display_info").toString()).toLowerCase();
+        return !"video".equalsIgnoreCase(resultType)
+                || node.path("is_pay").asInt(0) > 0
+                || node.path("badgepay").asBoolean(false)
+                || url.contains("/cheese/")
+                || badges.contains("付费")
+                || badges.contains("pay");
+    }
+
+    private boolean isSupportedBilibiliThumbnail(String url) {
+        if (!StringUtils.hasText(url)) {
+            return false;
+        }
+        try {
+            URI uri = URI.create(url);
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && (uri.getHost().endsWith(".hdslb.com") || "archive.biliimg.com".equalsIgnoreCase(uri.getHost()));
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private String fileKey(String url) {
@@ -467,6 +630,10 @@ public class DomesticSearchProvider {
 
     private String query(String keyword) {
         return StringUtils.hasText(keyword) ? keyword : "今日热点";
+    }
+
+    private boolean isHotKeyword(String keyword) {
+        return "今日热点".equals(query(keyword));
     }
 
     private String textOrDefault(String value, String fallback) {

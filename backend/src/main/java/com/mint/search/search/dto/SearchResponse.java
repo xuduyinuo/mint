@@ -15,6 +15,7 @@ public class SearchResponse {
     private long total;
     private int page;
     private int size;
+    private boolean hasNext;
     private String rankingExplain;
     private Map<String, Long> sourceDistribution;
 }

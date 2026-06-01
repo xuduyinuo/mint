@@ -19,7 +19,8 @@ public class MediaProxyController {
     private static final Set<String> ALLOWED_HOSTS = Set.of(
             "i0.hdslb.com",
             "i1.hdslb.com",
-            "i2.hdslb.com"
+            "i2.hdslb.com",
+            "archive.biliimg.com"
     );
 
     private final RestClient restClient = RestClient.builder()

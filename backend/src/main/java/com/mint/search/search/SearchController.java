@@ -22,6 +22,6 @@ public class SearchController {
                                  @RequestParam(defaultValue = "12") int size,
                                  @AuthenticationPrincipal SecurityUser user) {
         Long userId = user == null ? null : user.id();
-        return ApiResponse.ok(searchService.search(keyword, type, Math.max(page, 1), Math.min(Math.max(size, 1), 50), userId));
+        return ApiResponse.ok(searchService.search(keyword, type, Math.max(page, 1), Math.min(Math.max(size, 1), 16), userId));
     }
 }

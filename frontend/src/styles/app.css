@@ -132,6 +132,19 @@ body {
   background: #fff;
 }
 
+.pagination-bar {
+  display: flex;
+  justify-content: center;
+  max-width: 1180px;
+  margin: 26px auto 0;
+}
+
+.pagination-bar :deep(.el-pagination) {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
 .result-card {
   overflow: hidden;
   min-height: 238px;

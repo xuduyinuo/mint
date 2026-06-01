@@ -35,15 +35,15 @@ public class SearchService {
     public SearchResponse search(String keyword, String type, int page, int size, Long userId) {
         long start = System.currentTimeMillis();
         String searchType = normalizeType(type);
-        List<SearchItemDto> items = new ArrayList<>(domesticSearchProvider.search(keyword, searchType));
+        List<SearchItemDto> items = new ArrayList<>(domesticSearchProvider.search(keyword, searchType, page, size));
         List<SearchItemDto> ranked = rankingService.rank(keyword, searchType, preferences(userId), items);
-        int from = Math.max(0, (page - 1) * size);
-        int to = Math.min(ranked.size(), from + size);
-        List<SearchItemDto> pageItems = from >= ranked.size() ? List.of() : ranked.subList(from, to);
+        List<SearchItemDto> pageItems = ranked.stream().limit(size).toList();
+        boolean hasNext = ranked.size() >= size;
+        long estimatedTotal = (long) (page - 1) * size + pageItems.size() + (hasNext ? size : 0);
         Map<String, Long> distribution = ranked.stream()
                 .collect(Collectors.groupingBy(SearchItemDto::getType, LinkedHashMap::new, Collectors.counting()));
-        saveLog(userId, keyword, searchType, ranked.size(), System.currentTimeMillis() - start, distribution);
-        return new SearchResponse(keyword, searchType, pageItems, ranked.size(), page, size,
+        saveLog(userId, keyword, searchType, pageItems.size(), System.currentTimeMillis() - start, distribution);
+        return new SearchResponse(keyword, searchType, pageItems, estimatedTotal, page, size, hasNext,
                 "score = 相关性45% + 时效性20% + 权威性25% + 用户偏好10%", distribution);
     }
 

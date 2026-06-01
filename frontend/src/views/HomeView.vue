@@ -31,7 +31,7 @@
     <section v-if="searchResult" class="result-meta">
       <div>
         <b>{{ searchResult.keyword }}</b>
-        <span>共 {{ searchResult.total }} 条结果</span>
+        <span>第 {{ searchResult.page }} 页，每页 {{ searchResult.size }} 条</span>
       </div>
       <span>{{ searchResult.rankingExplain }}</span>
     </section>
@@ -62,6 +62,19 @@
           </footer>
         </div>
       </article>
+    </section>
+
+    <section v-if="searchResult && visibleItems.length > 0" class="pagination-bar">
+      <el-pagination
+        background
+        :current-page="currentPage"
+        :page-size="pageSize"
+        :page-sizes="pageSizeOptions"
+        :total="searchResult.total"
+        layout="total, sizes, prev, pager, next"
+        @current-change="handlePageChange"
+        @size-change="handlePageSizeChange"
+      />
     </section>
 
     <el-dialog v-model="previewVisible" width="min(760px, 94vw)" class="preview-dialog" destroy-on-close>
@@ -99,6 +112,9 @@ const previewVisible = ref(false)
 const preview = ref(null)
 const searchResult = ref(null)
 const recommendations = ref([])
+const currentPage = ref(1)
+const pageSize = ref(12)
+const pageSizeOptions = [12, 16]
 
 const typeOptions = [
   { label: '综合', value: 'all' },
@@ -127,13 +143,19 @@ async function loadRecommendations() {
 async function runSearch() {
   if (!keyword.value.trim()) {
     searchResult.value = null
+    currentPage.value = 1
     await loadRecommendations()
     return
   }
+  currentPage.value = 1
+  await executeSearch()
+}
+
+async function executeSearch() {
   loading.value = true
   try {
     searchResult.value = await http.get('/api/search', {
-      params: { q: keyword.value, type: activeType.value, page: 1, size: 24 }
+      params: { q: keyword.value, type: activeType.value, page: currentPage.value, size: pageSize.value }
     })
     if (user.loggedIn) {
       await http.post('/api/behavior', { eventType: 'SEARCH', keyword: keyword.value, itemType: activeType.value })
@@ -147,10 +169,22 @@ async function runSearch() {
 
 function handleTypeChange() {
   if (searchResult.value) {
+    currentPage.value = 1
     runSearch()
   } else {
     loadRecommendations()
   }
+}
+
+function handlePageChange(page) {
+  currentPage.value = page
+  executeSearch()
+}
+
+function handlePageSizeChange(size) {
+  pageSize.value = size
+  currentPage.value = 1
+  executeSearch()
 }
 
 async function trackClick(item) {
@@ -192,6 +226,7 @@ function openOriginal() {
 function reset() {
   keyword.value = ''
   searchResult.value = null
+  currentPage.value = 1
   loadRecommendations()
 }
 
