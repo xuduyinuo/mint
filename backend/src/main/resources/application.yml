@@ -6,9 +6,9 @@ spring:
     import: optional:classpath:application-local.yml
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/mint_search?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345678
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/mint_search?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
   data:
     redis:
       host: localhost
@@ -30,7 +30,7 @@ mybatis-plus:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:mint-search-demo-secret-key-change-me-2026}
+    secret: ${JWT_SECRET:}
     expiration-hours: 168
 
 newapi:
@@ -51,9 +51,9 @@ bailian:
   timeout-ms: ${BAILIAN_TIMEOUT_MS:5000}
 
 cos:
-  bucket: ${TENCENT_COS_BUCKET:mint-1327423861}
-  region: ${TENCENT_COS_REGION:ap-beijing}
-  custom-domain: ${TENCENT_COS_CUSTOM_DOMAIN:https://mint.xuduyinuo.cn}
+  bucket: ${TENCENT_COS_BUCKET:}
+  region: ${TENCENT_COS_REGION:}
+  custom-domain: ${TENCENT_COS_CUSTOM_DOMAIN:}
   secret-id: ${TENCENT_COS_SECRET_ID:}
   secret-key: ${TENCENT_COS_SECRET_KEY:}
 

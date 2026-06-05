@@ -16,7 +16,7 @@ public class JwtService {
     private final SecretKey key;
     private final long expirationHours;
 
-    public JwtService(@Value("${app.jwt.secret:mint-search-demo-secret-key-change-me-2026}") String secret,
+    public JwtService(@Value("${app.jwt.secret}") String secret,
                       @Value("${app.jwt.expiration-hours:168}") long expirationHours) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationHours = expirationHours;
