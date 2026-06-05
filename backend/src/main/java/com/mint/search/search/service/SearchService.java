@@ -47,6 +47,7 @@ public class SearchService {
         String searchType = normalizeType(type);
         List<SearchItemDto> items = new ArrayList<>(domesticSearchProvider.search(keyword, searchType, page, size));
         items.addAll(originalContent(keyword, searchType));
+        items = filterRelevant(keyword, searchType, items);
         List<SearchItemDto> ranked = rankingService.rank(keyword, searchType, preferences(userId), items);
         List<SearchItemDto> pageItems = ranked.stream().limit(size).toList();
         boolean hasNext = ranked.size() >= size;
@@ -102,6 +103,29 @@ public class SearchService {
             }
         }
         return false;
+    }
+
+    private List<SearchItemDto> filterRelevant(String keyword, String type, List<SearchItemDto> items) {
+        String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim().toLowerCase() : "";
+        if (!StringUtils.hasText(normalizedKeyword)) {
+            return items;
+        }
+        List<String> tokens = List.of(normalizedKeyword.split("\\s+")).stream()
+                .filter(StringUtils::hasText)
+                .toList();
+        if (tokens.isEmpty()) {
+            return items;
+        }
+        return items.stream()
+                .filter(item -> isTrustedTypedImage(type, item)
+                        || tokens.stream().anyMatch(token -> matches(token, item.getTitle(), item.getSummary(), item.getTags())))
+                .toList();
+    }
+
+    private boolean isTrustedTypedImage(String type, SearchItemDto item) {
+        return "image".equals(type)
+                && "image".equals(item.getType())
+                && !"Mint 原创图片".equals(item.getSourceName());
     }
 
     private SearchItemDto blogItem(BlogPost post) {

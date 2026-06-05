@@ -23,7 +23,8 @@ class DomesticSearchProviderTest {
         assertThat(items.getFirst().getTitle()).isEqualTo("Smartphone on desk");
         assertThat(items.getFirst().getUrl()).isEqualTo("https://www.pexels.com/photo/smartphone-101/");
         assertThat(items.getFirst().getThumbnailUrl()).isEqualTo("https://images.pexels.com/photos/101/medium.jpeg");
-        assertThat(items.getFirst().getSummary()).isEqualTo("Pexels 图片，摄影师：Alice，关键词：手机");
+        assertThat(items.getFirst().getSummary()).isEqualTo("Pexels 图片，摄影师：Alice");
+        assertThat(items.getFirst().getSummary()).doesNotContain("手机");
     }
 
     @Test
@@ -37,6 +38,7 @@ class DomesticSearchProviderTest {
         assertThat(items).hasSize(1);
         assertThat(items.getFirst().getType()).isEqualTo("news");
         assertThat(items.getFirst().getSourceName()).isEqualTo("腾讯新闻");
+        assertThat(items.getFirst().getTags()).doesNotContain("AI");
         assertThat(items.getFirst().getThumbnailUrl()).isEqualTo("https://inews.gtimg.com/a.jpg");
     }
 

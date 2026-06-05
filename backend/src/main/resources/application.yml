@@ -44,6 +44,12 @@ serpapi:
 pexels:
   api-key: ${PEXELS_API_KEY:}
 
+bailian:
+  base-url: ${BAILIAN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+  api-key: ${BAILIAN_API_KEY:}
+  model: ${BAILIAN_MODEL:qwen-plus}
+  timeout-ms: ${BAILIAN_TIMEOUT_MS:5000}
+
 cos:
   bucket: ${TENCENT_COS_BUCKET:mint-1327423861}
   region: ${TENCENT_COS_REGION:ap-beijing}

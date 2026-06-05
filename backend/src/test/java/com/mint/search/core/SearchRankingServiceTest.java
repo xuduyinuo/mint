@@ -26,6 +26,19 @@ class SearchRankingServiceTest {
         assertThat(ranked.getFirst().getScore()).isGreaterThan(ranked.getLast().getScore());
     }
 
+    @Test
+    void injectedQueryTagsDoNotMakeUnrelatedItemsLookRelevant() {
+        RankingService rankingService = new RankingService();
+        SearchItemDto unrelated = item("unrelated", "油价调整公告", "news", 0.9, LocalDateTime.now().minusHours(1));
+        unrelated.setSummary("多家航司发布燃油附加费调整公告。");
+        unrelated.setTags("腾讯新闻");
+        SearchItemDto related = item("related", "库里生涯首冠赛季集锦", "video", 0.8, LocalDateTime.now().minusDays(5));
+
+        List<SearchItemDto> ranked = rankingService.rank("库里", "all", Map.of(), List.of(unrelated, related));
+
+        assertThat(ranked.getFirst().getExternalId()).isEqualTo("related");
+    }
+
     private SearchItemDto item(String id, String title, String type, double authority, LocalDateTime publishedAt) {
         SearchItemDto item = new SearchItemDto();
         item.setExternalId(id);

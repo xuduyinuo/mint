@@ -41,8 +41,9 @@ public class BehaviorService {
             profile.setInterestTags("");
             profile.setPreferredTypes("");
         }
-        profile.setInterestTags(merge(profile.getInterestTags(), request.getKeyword(), request.getTags()));
-        profile.setPreferredTypes(merge(profile.getPreferredTypes(), request.getItemType()));
+        boolean highIntent = "CLICK".equalsIgnoreCase(request.getEventType());
+        profile.setInterestTags(merge(profile.getInterestTags(), highIntent, request.getKeyword(), request.getTags()));
+        profile.setPreferredTypes(merge(profile.getPreferredTypes(), highIntent, request.getItemType()));
         if (profile.getId() == null) {
             profileMapper.insert(profile);
         } else {
@@ -50,13 +51,19 @@ public class BehaviorService {
         }
     }
 
-    private String merge(String current, String... additions) {
+    private String merge(String current, boolean additionsFirst, String... additions) {
         Set<String> values = new LinkedHashSet<>();
-        if (StringUtils.hasText(current)) {
-            for (String value : current.split(",")) {
-                if (StringUtils.hasText(value)) values.add(value.trim());
-            }
+        if (additionsFirst) {
+            add(values, additions);
+            add(values, current);
+        } else {
+            add(values, current);
+            add(values, additions);
         }
+        return String.join(",", values.stream().limit(12).toList());
+    }
+
+    private void add(Set<String> values, String... additions) {
         for (String addition : additions) {
             if (StringUtils.hasText(addition)) {
                 for (String value : addition.split(",")) {
@@ -64,6 +71,5 @@ public class BehaviorService {
                 }
             }
         }
-        return String.join(",", values.stream().limit(12).toList());
     }
 }

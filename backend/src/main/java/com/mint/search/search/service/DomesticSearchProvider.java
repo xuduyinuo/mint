@@ -294,11 +294,11 @@ public class DomesticSearchProvider {
                 continue;
             }
             String photographer = node.path("photographer").asText("");
-            String title = textOrDefault(node.path("alt").asText(""), query(keyword) + " 图片");
+            String title = textOrDefault(node.path("alt").asText(""), "Pexels 图片");
             SearchItemDto item = baseItem("image", "Pexels", keyword, title, items.size() + 1);
             item.setUrl(url);
             item.setThumbnailUrl(thumbnailUrl);
-            item.setSummary("Pexels 图片，摄影师：" + textOrDefault(photographer, "未知") + "，关键词：" + query(keyword));
+            item.setSummary("Pexels 图片，摄影师：" + textOrDefault(photographer, "未知"));
             item.setPublishedAt(LocalDateTime.now());
             items.add(item);
         }
@@ -429,7 +429,7 @@ public class DomesticSearchProvider {
                 }
                 SearchItemDto item = baseItem("news", sourceName(node), keyword, title, items.size() + 1);
                 item.setUrl(url);
-                item.setSummary(textOrDefault(cleanHtml(node.path("abstract").asText("")), "腾讯新闻搜索结果，关键词：" + query(keyword)));
+                item.setSummary(textOrDefault(cleanHtml(node.path("abstract").asText("")), "腾讯新闻搜索结果"));
                 JsonNode thumbnails = node.path("thumbnails_qqnews");
                 item.setThumbnailUrl(thumbnails.isArray() && !thumbnails.isEmpty() ? thumbnails.get(0).asText("") : "");
                 item.setPublishedAt(parseTencentTime(node));
@@ -463,7 +463,7 @@ public class DomesticSearchProvider {
             String description = element.selectFirst("description") == null ? "" : cleanHtml(element.selectFirst("description").text());
             SearchItemDto item = baseItem("news", textOrDefault(sourceName, "Google 新闻"), keyword, title, items.size() + 1);
             item.setUrl(url);
-            item.setSummary(textOrDefault(description, "Google 新闻搜索结果，关键词：" + query(keyword)));
+            item.setSummary(textOrDefault(description, "Google 新闻搜索结果"));
             item.setThumbnailUrl("");
             item.setPublishedAt(parseRssDate(element.selectFirst("pubDate") == null ? "" : element.selectFirst("pubDate").text()));
             items.add(item);
@@ -491,7 +491,7 @@ public class DomesticSearchProvider {
             }
             SearchItemDto item = baseItem("video", textOrDefault(node.path("author").asText(""), "B站"), keyword, title, items.size() + 1);
             item.setUrl(url);
-            item.setSummary(textOrDefault(cleanHtml(node.path("description").asText("")), "B站视频搜索结果，关键词：" + query(keyword)));
+            item.setSummary(textOrDefault(cleanHtml(node.path("description").asText("")), "B站视频搜索结果"));
             item.setThumbnailUrl(mediaProxyUrl(thumbnailUrl));
             item.setPublishedAt(parseUnix(node.path("pubdate").asLong(0)));
             items.add(item);
@@ -513,7 +513,7 @@ public class DomesticSearchProvider {
             }
             SearchItemDto item = baseItem("video", serpApiYoutubeSource(node), keyword, title, items.size() + 1);
             item.setUrl(url);
-            item.setSummary(textOrDefault(node.path("snippet").asText(""), "YouTube 视频搜索结果，关键词：" + query(keyword)));
+            item.setSummary(textOrDefault(node.path("snippet").asText(""), "YouTube 视频搜索结果"));
             item.setThumbnailUrl(serpApiYoutubeThumbnail(node.path("thumbnail")));
             item.setPublishedAt(LocalDateTime.now());
             items.add(item);
@@ -527,7 +527,7 @@ public class DomesticSearchProvider {
         item.setType(type);
         item.setSourceName(sourceName);
         item.setTitle(title);
-        item.setTags(query(keyword) + "," + sourceName);
+        item.setTags(sourceName);
         item.setAuthorityScore(0.82);
         return item;
     }
@@ -579,7 +579,7 @@ public class DomesticSearchProvider {
         if (StringUtils.hasText(title) && StringUtils.hasText(url)) {
             SearchItemDto item = baseItem("news", tencentHotSourceName(node), keyword, cleanHtml(title), items.size() + 1);
             item.setUrl(url);
-            item.setSummary(textOrDefault(cleanHtml(node.path("abstract").asText("")), "腾讯新闻热点，关键词：" + query(keyword)));
+            item.setSummary(textOrDefault(cleanHtml(node.path("abstract").asText("")), "腾讯新闻热点"));
             item.setThumbnailUrl(tencentHotThumbnail(node));
             item.setPublishedAt(parseTencentHotTime(node));
             items.add(item);

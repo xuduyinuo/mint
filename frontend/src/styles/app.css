@@ -252,6 +252,13 @@ body {
   font-weight: 750;
 }
 
+.preview-header-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .preview-body {
   min-height: 220px;
 }
@@ -272,6 +279,39 @@ body {
   font-family: inherit;
   font-size: 15px;
   line-height: 1.8;
+}
+
+.analysis-panel {
+  display: grid;
+  gap: 16px;
+  color: #334155;
+}
+
+.analysis-panel section {
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.analysis-panel h3 {
+  margin: 0 0 8px;
+  color: #172033;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.analysis-panel p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.analysis-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .auth-page {

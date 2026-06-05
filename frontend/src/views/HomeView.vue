@@ -88,12 +88,28 @@
       <template #header>
         <div class="preview-header">
           <span>{{ preview?.title }}</span>
-          <el-tag>{{ typeLabel(preview?.type) }}</el-tag>
+          <div class="preview-header-tags">
+            <el-tag v-if="preview?.llmEnhanced" type="success">百炼分析</el-tag>
+            <el-tag>{{ typeLabel(preview?.type) }}</el-tag>
+          </div>
         </div>
       </template>
       <div v-loading="previewLoading" class="preview-body">
         <div v-if="preview?.thumbnailUrl" class="preview-cover" :style="{ backgroundImage: `url(${preview.thumbnailUrl})` }"></div>
-        <pre>{{ preview?.content }}</pre>
+        <div v-if="hasAnalysis(preview)" class="analysis-panel">
+          <section>
+            <h3>内容摘要</h3>
+            <p>{{ preview.analysisSummary }}</p>
+          </section>
+          <section>
+            <h3>推荐理由</h3>
+            <p>{{ preview.recommendReason }}</p>
+          </section>
+          <div v-if="preview.analysisTags?.length" class="analysis-tags">
+            <el-tag v-for="tag in preview.analysisTags" :key="tag" effect="plain">{{ tag }}</el-tag>
+          </div>
+        </div>
+        <pre v-else>{{ preview?.content }}</pre>
       </div>
       <template #footer>
         <el-button @click="previewVisible = false">关闭</el-button>
@@ -290,7 +306,15 @@ function isOriginalImage(item) {
 }
 
 function normalizePreview(item) {
-  return item ? { ...item, thumbnailUrl: normalizeThumbnailUrl(item.thumbnailUrl) } : item
+  return item ? {
+    ...item,
+    thumbnailUrl: normalizeThumbnailUrl(item.thumbnailUrl),
+    analysisTags: Array.isArray(item.analysisTags) ? item.analysisTags : []
+  } : item
+}
+
+function hasAnalysis(item) {
+  return Boolean(item?.analysisSummary || item?.recommendReason || item?.analysisTags?.length)
 }
 
 function normalizeThumbnailUrl(url) {
