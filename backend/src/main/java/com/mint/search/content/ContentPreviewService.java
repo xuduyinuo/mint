@@ -43,6 +43,7 @@ public class ContentPreviewService {
             case "news" -> "新闻";
             case "image" -> "图片";
             case "video" -> "视频";
+            case "blog" -> "博客";
             default -> "内容";
         };
     }

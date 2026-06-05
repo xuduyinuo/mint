@@ -26,7 +26,8 @@ class RecommendationServiceTest {
         RecommendationService service = new RecommendationService(
                 null,
                 hotDataService,
-                new RankingService()
+                new RankingService(),
+                null
         );
 
         var recommendations = service.recommend(null, "all");
@@ -43,9 +44,28 @@ class RecommendationServiceTest {
         RecommendationService service = new RecommendationService(
                 null,
                 hotDataService,
-                new RankingService()
+                new RankingService(),
+                null
         );
 
         assertThat(service.recommend(null, "all")).isEmpty();
+    }
+
+    @Test
+    void blogRecommendationsDoNotFallBackToNews() {
+        SearchItemDto item = new SearchItemDto();
+        item.setTitle("热点新闻");
+        item.setType("news");
+        HotDataService hotDataService = mock(HotDataService.class);
+        when(hotDataService.getHotData("all")).thenReturn(List.of(item));
+
+        RecommendationService service = new RecommendationService(
+                null,
+                hotDataService,
+                new RankingService(),
+                null
+        );
+
+        assertThat(service.recommend(null, "blog")).isEmpty();
     }
 }

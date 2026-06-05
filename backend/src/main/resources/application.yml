@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  config:
+    import: optional:classpath:application-local.yml
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/mint_search?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
@@ -40,7 +42,14 @@ serpapi:
   api-key: ${SERPAPI_API_KEY:}
 
 pexels:
-  api-key: ${PEXELS_API_KEY:OIcgUFKWvEFDOugoNR0AAqn1wY6zJsKughRc6KFFcJDi7bFGnfzlSEuZ}
+  api-key: ${PEXELS_API_KEY:}
+
+cos:
+  bucket: ${TENCENT_COS_BUCKET:mint-1327423861}
+  region: ${TENCENT_COS_REGION:ap-beijing}
+  custom-domain: ${TENCENT_COS_CUSTOM_DOMAIN:https://mint.xuduyinuo.cn}
+  secret-id: ${TENCENT_COS_SECRET_ID:}
+  secret-key: ${TENCENT_COS_SECRET_KEY:}
 
 hot:
   refresh-interval-ms: ${HOT_REFRESH_INTERVAL_MS:3600000}

@@ -3,6 +3,9 @@ package com.mint.search.search.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mint.search.search.dto.SearchItemDto;
+import com.mint.search.source.SearchSource;
+import com.mint.search.source.mapper.SearchSourceMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.jsoup.Jsoup;
 import org.jsoup.parser.Parser;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +26,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -39,14 +44,17 @@ public class DomesticSearchProvider {
     };
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final SearchSourceMapper sourceMapper;
     private final String serpApiKey;
     private final String pexelsApiKey;
 
     @Autowired
     public DomesticSearchProvider(ObjectMapper objectMapper,
+                                  SearchSourceMapper sourceMapper,
                                   @Value("${serpapi.api-key:}") String serpApiKey,
                                   @Value("${pexels.api-key:}") String pexelsApiKey) {
         this.objectMapper = objectMapper;
+        this.sourceMapper = sourceMapper;
         this.serpApiKey = serpApiKey;
         this.pexelsApiKey = pexelsApiKey;
         this.restClient = RestClient.builder()
@@ -56,7 +64,14 @@ public class DomesticSearchProvider {
     }
 
     public DomesticSearchProvider(ObjectMapper objectMapper) {
-        this(objectMapper, "", "");
+        this.objectMapper = objectMapper;
+        this.sourceMapper = null;
+        this.serpApiKey = "";
+        this.pexelsApiKey = "";
+        this.restClient = RestClient.builder()
+                .defaultHeader("User-Agent", USER_AGENT)
+                .defaultHeader("Accept", "text/html,application/json,*/*")
+                .build();
     }
 
     public List<SearchItemDto> search(String keyword, String type) {
@@ -68,20 +83,26 @@ public class DomesticSearchProvider {
         int searchPage = Math.max(page, 1);
         int pageSize = Math.min(Math.max(size, 1), 16);
         List<SearchItemDto> items = new ArrayList<>();
-        if ("all".equalsIgnoreCase(searchType) || "news".equalsIgnoreCase(searchType)) {
-            items.addAll(searchTencentNews(keyword, searchPage, pageSize));
-        }
-        if ("all".equalsIgnoreCase(searchType) || "image".equalsIgnoreCase(searchType)) {
-            items.addAll(searchPexelsImages(keyword, searchPage, pageSize));
-        }
-        if ("all".equalsIgnoreCase(searchType) || "video".equalsIgnoreCase(searchType)) {
-            items.addAll(searchBilibiliVideos(keyword, searchPage, pageSize));
+        for (SourceRuntime source : activeSources(searchType)) {
+            List<SearchItemDto> sourceItems = switch (source.provider()) {
+                case "tencent_news" -> searchTencentNews(keyword, searchPage, pageSize);
+                case "google_news_rss" -> searchGoogleNewsRss(keyword, searchPage, pageSize);
+                case "pexels" -> searchPexelsImages(keyword, searchPage, pageSize, source.apiKey(pexelsApiKey));
+                case "bilibili" -> searchBilibiliVideos(keyword, searchPage, pageSize);
+                case "serpapi_youtube" -> searchSerpApiYoutubeVideos(keyword, source.apiKey(serpApiKey));
+                default -> List.of();
+            };
+            items.addAll(applySourceConfig(sourceItems, source));
         }
         return items;
     }
 
     private List<SearchItemDto> searchPexelsImages(String keyword, int page, int size) {
-        if (!StringUtils.hasText(pexelsApiKey)) {
+        return searchPexelsImages(keyword, page, size, pexelsApiKey);
+    }
+
+    private List<SearchItemDto> searchPexelsImages(String keyword, int page, int size, String apiKey) {
+        if (!StringUtils.hasText(apiKey)) {
             return List.of();
         }
         try {
@@ -94,7 +115,7 @@ public class DomesticSearchProvider {
                     .toUri();
             String raw = restClient.get()
                     .uri(uri)
-                    .header(HttpHeaders.AUTHORIZATION, pexelsApiKey)
+                    .header(HttpHeaders.AUTHORIZATION, apiKey)
                     .retrieve()
                     .body(String.class);
             return parsePexelsImages(raw, keyword);
@@ -242,12 +263,16 @@ public class DomesticSearchProvider {
     }
 
     private List<SearchItemDto> searchSerpApiYoutubeVideos(String keyword) {
-        if (!StringUtils.hasText(serpApiKey)) {
+        return searchSerpApiYoutubeVideos(keyword, serpApiKey);
+    }
+
+    private List<SearchItemDto> searchSerpApiYoutubeVideos(String keyword, String apiKey) {
+        if (!StringUtils.hasText(apiKey)) {
             return List.of();
         }
         try {
             String raw = restClient.get()
-                    .uri(buildSerpApiYoutubeSearchUri(keyword, serpApiKey))
+                    .uri(buildSerpApiYoutubeSearchUri(keyword, apiKey))
                     .retrieve()
                     .body(String.class);
             return parseSerpApiYoutubeVideos(raw, keyword);
@@ -278,6 +303,111 @@ public class DomesticSearchProvider {
             items.add(item);
         }
         return items.stream().limit(24).toList();
+    }
+
+    private List<SourceRuntime> activeSources(String type) {
+        if (sourceMapper == null) {
+            return defaultSources().stream()
+                    .filter(source -> supportsType(source, type))
+                    .toList();
+        }
+        List<SearchSource> rows = sourceMapper.selectList(new LambdaQueryWrapper<SearchSource>()
+                .eq(SearchSource::getEnabled, 1)
+                .orderByDesc(SearchSource::getWeight)
+                .orderByDesc(SearchSource::getAuthorityScore));
+        List<SourceRuntime> sources = rows.stream()
+                .map(this::toRuntime)
+                .filter(source -> supportsType(source, type))
+                .sorted(Comparator.comparing(SourceRuntime::weight).reversed())
+                .toList();
+        if (!sources.isEmpty()) {
+            return sources;
+        }
+        return defaultSources().stream()
+                .filter(source -> supportsType(source, type))
+                .toList();
+    }
+
+    private boolean supportsType(SourceRuntime source, String type) {
+        return "all".equalsIgnoreCase(type) || source.type().equalsIgnoreCase(type);
+    }
+
+    private SourceRuntime toRuntime(SearchSource source) {
+        Map<String, String> config = parseConfig(source.getConfigJson());
+        String provider = config.getOrDefault("provider", providerFromName(source));
+        return new SourceRuntime(
+                source.getName(),
+                source.getType(),
+                provider,
+                source.getWeight() == null ? 1.0 : source.getWeight(),
+                source.getAuthorityScore() == null ? 0.7 : source.getAuthorityScore(),
+                config
+        );
+    }
+
+    private List<SourceRuntime> defaultSources() {
+        return List.of(
+                new SourceRuntime("腾讯新闻", "news", "tencent_news", 1.15, 0.86, Map.of()),
+                new SourceRuntime("Google News RSS", "news", "google_news_rss", 0.85, 0.78, Map.of()),
+                new SourceRuntime("Pexels", "image", "pexels", 0.95, 0.76, Map.of()),
+                new SourceRuntime("Bilibili", "video", "bilibili", 1.0, 0.8, Map.of())
+        );
+    }
+
+    private List<SearchItemDto> applySourceConfig(List<SearchItemDto> items, SourceRuntime source) {
+        return items.stream().peek(item -> {
+            if (StringUtils.hasText(source.name())) {
+                item.setSourceName(source.name());
+            }
+            item.setAuthorityScore(source.authorityScore());
+            item.setScore(source.weight());
+            item.setTags(item.getTags() + "," + source.provider());
+        }).toList();
+    }
+
+    private Map<String, String> parseConfig(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return Map.of();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(raw);
+            Map<String, String> config = new LinkedHashMap<>();
+            root.fields().forEachRemaining(entry -> config.put(entry.getKey(), entry.getValue().asText("")));
+            return config;
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+    }
+
+    private String providerFromName(SearchSource source) {
+        String name = source.getName() == null ? "" : source.getName().toLowerCase();
+        if (name.contains("tencent") || name.contains("腾讯")) {
+            return "tencent_news";
+        }
+        if (name.contains("google")) {
+            return "google_news_rss";
+        }
+        if (name.contains("pexels")) {
+            return "pexels";
+        }
+        if (name.contains("bilibili") || name.contains("b站")) {
+            return "bilibili";
+        }
+        if (name.contains("serpapi") || name.contains("youtube")) {
+            return "serpapi_youtube";
+        }
+        return switch (source.getType()) {
+            case "image" -> "pexels";
+            case "video" -> "bilibili";
+            default -> "tencent_news";
+        };
+    }
+
+    private record SourceRuntime(String name, String type, String provider, double weight, double authorityScore,
+                                 Map<String, String> config) {
+        String apiKey(String fallback) {
+            return StringUtils.hasText(config.get("apiKey")) ? config.get("apiKey") : fallback;
+        }
     }
 
     public List<SearchItemDto> parseTencentNews(String json, String keyword) throws Exception {

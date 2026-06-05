@@ -106,3 +106,37 @@ CREATE TABLE IF NOT EXISTS ranking_config (
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS uploaded_asset (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  asset_type VARCHAR(32) NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  object_key VARCHAR(512) NOT NULL,
+  url VARCHAR(512) NOT NULL,
+  content_type VARCHAR(120),
+  file_size BIGINT DEFAULT 0,
+  tags VARCHAR(512),
+  blocked TINYINT NOT NULL DEFAULT 0,
+  deleted TINYINT NOT NULL DEFAULT 0,
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_uploaded_asset_user (user_id),
+  INDEX idx_uploaded_asset_type (asset_type)
+);
+
+CREATE TABLE IF NOT EXISTS blog_post (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  summary VARCHAR(512),
+  cover_url VARCHAR(512),
+  tags VARCHAR(512),
+  content MEDIUMTEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+  blocked TINYINT NOT NULL DEFAULT 0,
+  deleted TINYINT NOT NULL DEFAULT 0,
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_blog_user (user_id),
+  INDEX idx_blog_status (status)
+);

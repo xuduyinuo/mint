@@ -3,6 +3,7 @@
     <header class="topbar">
       <div class="brand" @click="reset">Mint Search</div>
       <nav class="nav-actions">
+        <el-button v-if="user.loggedIn" text @click="$router.push('/creator')">创作中心</el-button>
         <el-button v-if="user.isAdmin" text @click="$router.push('/admin')">管理后台</el-button>
         <template v-if="user.loggedIn">
           <span class="user-chip">{{ user.user?.nickname }}</span>
@@ -42,26 +43,32 @@
         class="empty-state"
         description="暂无真实来源内容，请尝试更换关键词或稍后重试"
       />
-      <article
-        v-for="item in visibleItems"
-        :key="item.externalId"
-        class="result-card"
-        @click="trackClick(item)"
-      >
-        <div v-if="item.thumbnailUrl" class="thumb" :style="{ backgroundImage: `url(${item.thumbnailUrl})` }">
-          <span>{{ typeLabel(item.type) }}</span>
+      <template v-for="group in visibleGroups" :key="group.key">
+        <div v-if="group.title" class="result-group-title">
+          <h2>{{ group.title }}</h2>
+          <span>{{ group.items.length }} 条</span>
         </div>
-        <div v-else class="text-thumb">
-          <span>{{ typeLabel(item.type) }}</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">{{ item.title }}</div>
-          <footer>
-            <span>{{ item.sourceName }}</span>
-            <span>{{ formatDate(item.publishedAt) }}</span>
-          </footer>
-        </div>
-      </article>
+        <article
+          v-for="item in group.items"
+          :key="item.externalId"
+          class="result-card"
+          @click="trackClick(item)"
+        >
+          <div v-if="item.thumbnailUrl" class="thumb" :style="{ backgroundImage: `url(${item.thumbnailUrl})` }">
+            <span>{{ typeLabel(item.type) }}</span>
+          </div>
+          <div v-else class="text-thumb">
+            <span>{{ typeLabel(item.type) }}</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">{{ item.title }}</div>
+            <footer>
+              <span>{{ item.sourceName }}</span>
+              <span>{{ formatDate(item.publishedAt) }}</span>
+            </footer>
+          </div>
+        </article>
+      </template>
     </section>
 
     <section v-if="searchResult && visibleItems.length > 0" class="pagination-bar">
@@ -120,12 +127,34 @@ const typeOptions = [
   { label: '综合', value: 'all' },
   { label: '新闻', value: 'news' },
   { label: '图片', value: 'image' },
+  { label: '博客', value: 'blog' },
   { label: '视频', value: 'video' }
 ]
 
 const bilibiliThumbnailHosts = new Set(['i0.hdslb.com', 'i1.hdslb.com', 'i2.hdslb.com'])
 
-const visibleItems = computed(() => normalizeItems(searchResult.value?.records || recommendations.value))
+const visibleItems = computed(() => normalizeItems(searchResult.value?.records || typedRecommendations.value))
+const typedRecommendations = computed(() => {
+  if (searchResult.value) {
+    return []
+  }
+  if (activeType.value === 'all') {
+    return recommendations.value
+  }
+  return recommendations.value.filter((item) => item.type === activeType.value)
+})
+const visibleGroups = computed(() => {
+  const items = visibleItems.value
+  if (activeType.value !== 'image') {
+    return [{ key: 'all', title: '', items }]
+  }
+  const originalItems = items.filter(isOriginalImage)
+  const platformItems = items.filter((item) => !isOriginalImage(item))
+  return [
+    { key: 'original', title: '原创内容', items: originalItems },
+    { key: 'platform', title: '其他平台资源', items: platformItems }
+  ].filter((group) => group.items.length > 0)
+})
 
 onMounted(loadRecommendations)
 
@@ -254,6 +283,10 @@ function normalizeItems(items = []) {
     ...item,
     thumbnailUrl: normalizeThumbnailUrl(item.thumbnailUrl)
   }))
+}
+
+function isOriginalImage(item) {
+  return item?.type === 'image' && item?.sourceName === 'Mint 原创图片'
 }
 
 function normalizePreview(item) {

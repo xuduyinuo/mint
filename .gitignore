@@ -28,6 +28,7 @@ logs/
 .env
 .env.*
 !.env.example
+backend/src/main/resources/application-local.yml
 
 # =========================
 # Java / Maven (backend)

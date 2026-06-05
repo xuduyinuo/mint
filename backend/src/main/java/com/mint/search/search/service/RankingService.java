@@ -1,6 +1,10 @@
 package com.mint.search.search.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mint.search.ranking.RankingConfig;
+import com.mint.search.ranking.mapper.RankingConfigMapper;
 import com.mint.search.search.dto.SearchItemDto;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -13,23 +17,64 @@ import java.util.Map;
 
 @Service
 public class RankingService {
+    private final RankingConfigMapper rankingMapper;
+
+    public RankingService() {
+        this.rankingMapper = null;
+    }
+
+    @Autowired
+    public RankingService(RankingConfigMapper rankingMapper) {
+        this.rankingMapper = rankingMapper;
+    }
+
     public List<SearchItemDto> rank(String keyword, String type, Map<String, Double> userPreferences, List<SearchItemDto> items) {
         String normalized = keyword == null ? "" : keyword.toLowerCase(Locale.ROOT).trim();
         LocalDateTime now = LocalDateTime.now();
-        items.forEach(item -> item.setScore(score(item, normalized, type, userPreferences, now)));
+        RankingConfig config = activeConfig();
+        items.forEach(item -> item.setScore(score(item, normalized, type, userPreferences, now, config)));
         return items.stream()
                 .sorted(Comparator.comparing(SearchItemDto::getScore, Comparator.nullsLast(Double::compareTo)).reversed())
                 .toList();
     }
 
     private double score(SearchItemDto item, String keyword, String requestedType,
-                         Map<String, Double> userPreferences, LocalDateTime now) {
+                         Map<String, Double> userPreferences, LocalDateTime now, RankingConfig config) {
         double relevance = relevance(item, keyword);
         double freshness = freshness(item.getPublishedAt(), now);
         double authority = item.getAuthorityScore() == null ? 0.5 : item.getAuthorityScore();
         double preference = userPreferences.getOrDefault(item.getType(), 1.0);
+        double sourceWeight = item.getScore() == null ? 1.0 : item.getScore();
         double typeBoost = StringUtils.hasText(requestedType) && !"all".equals(requestedType) && requestedType.equals(item.getType()) ? 0.3 : 0.0;
-        return relevance * 0.45 + freshness * 0.2 + authority * 0.25 + preference * 0.1 + typeBoost;
+        double baseScore = relevance * config.getRelevanceWeight()
+                + freshness * config.getFreshnessWeight()
+                + authority * config.getAuthorityWeight()
+                + preference * config.getPreferenceWeight()
+                + typeBoost;
+        return baseScore * sourceWeight;
+    }
+
+    private RankingConfig activeConfig() {
+        if (rankingMapper == null) {
+            return fallbackConfig();
+        }
+        RankingConfig config = rankingMapper.selectOne(new LambdaQueryWrapper<RankingConfig>()
+                .eq(RankingConfig::getEnabled, 1)
+                .orderByDesc(RankingConfig::getUpdateTime)
+                .last("LIMIT 1"));
+        if (config != null) {
+            return config;
+        }
+        return fallbackConfig();
+    }
+
+    private RankingConfig fallbackConfig() {
+        RankingConfig fallback = new RankingConfig();
+        fallback.setRelevanceWeight(0.45);
+        fallback.setFreshnessWeight(0.2);
+        fallback.setAuthorityWeight(0.25);
+        fallback.setPreferenceWeight(0.1);
+        return fallback;
     }
 
     private double relevance(SearchItemDto item, String keyword) {
