@@ -431,7 +431,7 @@ public class DomesticSearchProvider {
                 item.setUrl(url);
                 item.setSummary(textOrDefault(cleanHtml(node.path("abstract").asText("")), "腾讯新闻搜索结果"));
                 JsonNode thumbnails = node.path("thumbnails_qqnews");
-                item.setThumbnailUrl(thumbnails.isArray() && !thumbnails.isEmpty() ? thumbnails.get(0).asText("") : "");
+                item.setThumbnailUrl(mediaProxyUrl(thumbnails.isArray() && !thumbnails.isEmpty() ? thumbnails.get(0).asText("") : ""));
                 item.setPublishedAt(parseTencentTime(node));
                 items.add(item);
             }
@@ -580,7 +580,7 @@ public class DomesticSearchProvider {
             SearchItemDto item = baseItem("news", tencentHotSourceName(node), keyword, cleanHtml(title), items.size() + 1);
             item.setUrl(url);
             item.setSummary(textOrDefault(cleanHtml(node.path("abstract").asText("")), "腾讯新闻热点"));
-            item.setThumbnailUrl(tencentHotThumbnail(node));
+            item.setThumbnailUrl(mediaProxyUrl(tencentHotThumbnail(node)));
             item.setPublishedAt(parseTencentHotTime(node));
             items.add(item);
         }
@@ -763,7 +763,7 @@ public class DomesticSearchProvider {
     }
 
     private boolean isHotKeyword(String keyword) {
-        return "今日热点".equals(query(keyword));
+        return query(keyword).contains("热点");
     }
 
     private String textOrDefault(String value, String fallback) {

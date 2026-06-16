@@ -147,6 +147,7 @@ const typeOptions = [
   { label: '视频', value: 'video' }
 ]
 
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
 const bilibiliThumbnailHosts = new Set(['i0.hdslb.com', 'i1.hdslb.com', 'i2.hdslb.com'])
 
 const visibleItems = computed(() => normalizeItems(searchResult.value?.records || typedRecommendations.value))
@@ -323,16 +324,20 @@ function normalizeThumbnailUrl(url) {
   }
   const normalized = url.startsWith('//') ? `https:${url}` : url
   if (normalized.startsWith('/api/media/thumbnail')) {
-    return normalized
+    return apiUrl(normalized)
   }
   try {
     const parsed = new URL(normalized, window.location.origin)
     if (bilibiliThumbnailHosts.has(parsed.hostname)) {
-      return `/api/media/thumbnail?url=${encodeURIComponent(parsed.href)}`
+      return apiUrl(`/api/media/thumbnail?url=${encodeURIComponent(parsed.href)}`)
     }
   } catch (error) {
     return normalized
   }
   return normalized
+}
+
+function apiUrl(path) {
+  return new URL(path, `${apiBaseUrl}/`).href
 }
 </script>

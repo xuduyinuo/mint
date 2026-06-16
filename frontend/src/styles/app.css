@@ -194,7 +194,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e6eef7, #f7efe3);
+  background:
+    radial-gradient(circle at 72% 24%, rgba(64, 158, 255, .18), transparent 30%),
+    linear-gradient(135deg, #e6eef7, #f7efe3);
+}
+
+.text-thumb::after {
+  content: "暂无封面";
+  color: #8a97a8;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
 }
 
 .thumb span,

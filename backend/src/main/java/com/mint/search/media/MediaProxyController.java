@@ -20,12 +20,12 @@ public class MediaProxyController {
             "i0.hdslb.com",
             "i1.hdslb.com",
             "i2.hdslb.com",
-            "archive.biliimg.com"
+            "archive.biliimg.com",
+            "inews.gtimg.com"
     );
 
     private final RestClient restClient = RestClient.builder()
             .defaultHeader(HttpHeaders.USER_AGENT, "Mozilla/5.0")
-            .defaultHeader(HttpHeaders.REFERER, "https://www.bilibili.com/")
             .build();
 
     @GetMapping("/thumbnail")
@@ -39,6 +39,7 @@ public class MediaProxyController {
         }
         ResponseEntity<byte[]> response = restClient.get()
                 .uri(uri)
+                .header(HttpHeaders.REFERER, referer(uri.getHost()))
                 .retrieve()
                 .toEntity(byte[].class);
         MediaType contentType = response.getHeaders().getContentType();
@@ -46,5 +47,12 @@ public class MediaProxyController {
                 .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
                 .contentType(contentType == null ? MediaType.APPLICATION_OCTET_STREAM : contentType)
                 .body(response.getBody());
+    }
+
+    private String referer(String host) {
+        if ("inews.gtimg.com".equalsIgnoreCase(host)) {
+            return "https://news.qq.com/";
+        }
+        return "https://www.bilibili.com/";
     }
 }

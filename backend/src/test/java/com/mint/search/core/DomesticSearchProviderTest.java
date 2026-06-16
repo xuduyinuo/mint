@@ -39,7 +39,8 @@ class DomesticSearchProviderTest {
         assertThat(items.getFirst().getType()).isEqualTo("news");
         assertThat(items.getFirst().getSourceName()).isEqualTo("腾讯新闻");
         assertThat(items.getFirst().getTags()).doesNotContain("AI");
-        assertThat(items.getFirst().getThumbnailUrl()).isEqualTo("https://inews.gtimg.com/a.jpg");
+        assertThat(items.getFirst().getThumbnailUrl())
+                .isEqualTo("/api/media/thumbnail?url=https%3A%2F%2Finews.gtimg.com%2Fa.jpg");
     }
 
     @Test
@@ -56,7 +57,8 @@ class DomesticSearchProviderTest {
 
         assertThat(items).hasSize(2);
         assertThat(items.getFirst().getSourceName()).isEqualTo("腾讯新闻问答");
-        assertThat(items.getFirst().getThumbnailUrl()).isEqualTo("https://inews.gtimg.com/newsapp_bt/0/a/0");
+        assertThat(items.getFirst().getThumbnailUrl())
+                .isEqualTo("/api/media/thumbnail?url=https%3A%2F%2Finews.gtimg.com%2Fnewsapp_bt%2F0%2Fa%2F0");
         assertThat(items.get(1).getSourceName()).isEqualTo("腾讯新闻");
         assertThat(items.get(1).getUrl()).isEqualTo("https://view.inews.qq.com/a/A1");
     }
